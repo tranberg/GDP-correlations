@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+    <link type="text/css" rel="stylesheet" href="css/style.css"/>
+  </head>
+  <body>
+    <script type="text/javascript" src="js/d3/d3.js"></script>
+    <script type="text/javascript" src="js/d3/d3.layout.js"></script>
+    <script type="text/javascript" src="js/packages.js"></script>
+    <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
+    <script type="text/javascript">
+
+var w = 800,
+    h = 760,
+    rx = w / 2,
+    ry = h / 2,
+    m0,
+    rotate = 0;
+
+var splines = [];
+
+var cluster = d3.layout.cluster()
+    .size([360, ry - 120])
+    .sort(function(a, b) { return d3.ascending(a.key, b.key); });
+
+var bundle = d3.layout.bundle();
+
+var line = d3.svg.line.radial()
+    .interpolate("bundle")
+    .tension(.60)
+    .radius(function(d) { return d.y; })
+    .angle(function(d) { return d.x / 180 * Math.PI; });
+
+// Chrome 15 bug: <http://code.google.com/p/chromium/issues/detail?id=98951>
+var div = d3.select("body").insert("div", "h2")
+    .style("top", "30px")
+    .style("left", "50px")
+    .style("width", w + "px")
+    .style("height", h + "px")
+    .style("position", "absolute")
+    .style("-webkit-backface-visibility", "hidden");
+
+var svg = div.append("svg:svg")
+    .attr("width", w)
+    .attr("height", h)
+    .append("svg:g")
+    .attr("transform", "translate(" + rx + "," + ry + ")");
+
+svg.append("svg:path")
+    .attr("class", "arc")
+    .attr("d", d3.svg.arc().outerRadius(ry - 120).innerRadius(0).startAngle(0).endAngle(2 * Math.PI))
+    .on("mousedown", mousedown);
+
+d3.json("correlations.json", function(classes) {
+  var nodes = cluster.nodes(packages.root(classes)),
+      links = packages.connections(nodes),
+      splines = bundle(links);
+
+  var path = svg.selectAll("path.link")
+      .data(links)
+      .enter().append("svg:path")
+      .attr("class", function(d) { return "link source-" + d.source.key + " target-" + d.target.key; })
+      .attr("d", function(d, i) { return line(splines[i]); })
+      .attr("style", function(d) { return "stroke-width:2px"; })
+      .attr("w", function(d) { return d.strength.key; });
+
+  svg.selectAll("g.node")
+      .data(nodes.filter(function(n) { return !n.children; }))
+      .enter().append("svg:g")
+      .attr("class", "node")
+      .attr("id", function(d) { return "node-" + d.key; })
+      .attr("transform", function(d) { return "rotate(" + (d.x - 90) + ")translate(" + d.y + ")"; })
+      .append("svg:text")
+      .attr("dx", function(d) { return d.x < 180 ? 8 : -8; })
+      .attr("dy", ".31em")
+      .attr("text-anchor", function(d) { return d.x < 180 ? "start" : "end"; })
+      .attr("transform", function(d) { return d.x < 180 ? null : "rotate(180)"; })
+      .text(function(d) { return d.key; })
+
+    // Show only links for corr +/- .2
+    d3.selectAll("[class=makeUpdate]").on("change", function() {
+        if (typeof country == "undefined") {
+            country = "All"
+        };
+        // Input range has a problem with negative numbers, so we start from 0 and scale
+        // accordingly.
+        var corr = Math.round((($("#correlation").val() / 50) - 1) * 100) / 100;
+        interval = setInterval($("#interval").val())
+        // Iterate over all links
+        svg.selectAll("path.link").each(function (obj, index) {
+            // Get class and prepare for _classed_ function below
+            var cls = "path.".concat($(this).attr('class').replace(/ /g, '.')),
+                weight = $(this).attr('w');
+            // Is the specific link outside the margin to be displayed?
+            if (Math.abs(weight - corr) > interval) {
+                svg.selectAll(cls).classed('hide', true);
+            } else {
+                // Has a single country been picked?
+                if (country != "All") {
+                    // Does this link connect to the selected country?
+                    if (cls.indexOf(country) !==-1  ) {
+                        // yes
+                        svg.selectAll(cls).classed('hide', false);
+                    } else {
+                        // no
+                        svg.selectAll(cls).classed('hide', true);
+                    };
+                } else {
+                    // Show links, within the specified margin, connecting all countries
+                    svg.selectAll(cls).classed('hide', false);
+                };
+            };
+        });
+    });
+});
+
+
+d3.select(window)
+    .on("mousemove", mousemove)
+    .on("mouseup", mouseup);
+
+function mouse(e) {
+  return [e.pageX - rx, e.pageY - ry];
+}
+
+function mousedown() {
+  m0 = mouse(d3.event);
+  d3.event.preventDefault();
+}
+
+function mousemove() {
+  if (m0) {
+    var m1 = mouse(d3.event),
+        dm = Math.atan2(cross(m0, m1), dot(m0, m1)) * 180 / Math.PI;
+    div.style("-webkit-transform", "translateY(" + (ry - rx) + "px)rotateZ(" + dm + "deg)translateY(" + (rx - ry) + "px)");
+  }
+}
+
+function mouseup() {
+  if (m0) {
+    var m1 = mouse(d3.event),
+        dm = Math.atan2(cross(m0, m1), dot(m0, m1)) * 180 / Math.PI;
+
+    rotate += dm;
+    if (rotate > 360) rotate -= 360;
+    else if (rotate < 0) rotate += 360;
+    m0 = null;
+
+    div.style("-webkit-transform", null);
+
+    svg
+        .attr("transform", "translate(" + rx + "," + ry + ")rotate(" + rotate + ")")
+        .selectAll("g.node text")
+        .attr("dx", function(d) { return (d.x + rotate) % 360 < 180 ? 8 : -8; })
+        .attr("text-anchor", function(d) { return (d.x + rotate) % 360 < 180 ? "start" : "end"; })
+        .attr("transform", function(d) { return (d.x + rotate) % 360 < 180 ? null : "rotate(180)"; });
+  }
+}
+
+function cross(a, b) {
+  return a[0] * b[1] - a[1] * b[0];
+}
+
+function dot(a, b) {
+  return a[0] * b[0] + a[1] * b[1];
+}
+
+// Set correlation interval
+function setInterval(w) {
+    w /= 100
+    $("#intr").html(w.toFixed(2));
+    return w
+}
+
+// Handle dropdown selection
+function ddfunc() {
+    var dd = document.getElementById("dd");
+    var selected = dd.options[dd.selectedIndex].text;
+    country = selected;
+}
+    </script>
+
+    <a href="http://tberg.dk/post/GDP-correlations/" style="position:absolute;top:15px;left:0;font-size:16px;">&lt; back to tberg</a>
+
+    <h2 style="position:absolute;top:5px;right:253px;">
+      Correlations in evolution of GDP
+    </h2>
+
+    <div style="position:absolute;bottom:0;font-size:18px;text-align:center;">
+        Correlation: <span id="corr">0.00</span><br>-1
+        <input id="correlation" class="makeUpdate" style="position:relative;top:3px;width:200px;" type="range" min="0" max="100" value="50" step="1" oninput="$('#corr').html((Math.round(((this.value / 50) - 1) * 100) / 100).toFixed(2));"> 1
+    </div>
+
+    <div style="position:absolute;bottom:0;right:0;font-size:18px;text-align:center;">
+        Corr. interval: &#177; <span id="intr">0.20</span><br>0
+        <input id="interval" class="makeUpdate" style="position:relative;top:3px;width:200px;" type="range" min="0" max="100" value="20" step="1" oninput="setInterval(this.value)" onchange="setInterval(this.value)"> 1
+    </div>
+
+    <div style="position:absolute;bottom:0;left:380px;font-size:18px;text-align:center;">
+        Country:<br>
+        <select id="dd" class="makeUpdate" name=dd onchange='ddfunc();'>
+            <option selected="selected"> All </option>
+            <option>Australia</option>
+            <option>Austria</option>
+            <option>Belgium</option>
+            <option>Canada</option>
+            <option>Czech_Republic</option>
+            <option>Denmark</option>
+            <option>Finland</option>
+            <option>France</option>
+            <option>Germany</option>
+            <option>Greece</option>
+            <option>Hungary</option>
+            <option>Iceland</option>
+            <option>Ireland</option>
+            <option>Italy</option>
+            <option>Japan</option>
+            <option>Korea</option>
+            <option>Luxembourg</option>
+            <option>Mexico</option>
+            <option>Netherlands</option>
+            <option>New_Zealand</option>
+            <option>Norway</option>
+            <option>Poland</option>
+            <option>Portugal</option>
+            <option>Slovak_Republic</option>
+            <option>Spain</option>
+            <option>Sweden</option>
+            <option>Switzerland</option>
+            <option>Turkey</option>
+            <option>United_Kingdom</option>
+            <option>United_States</option>
+            <option>Brazil</option>
+            <option>China</option>
+            <option>India</option>
+            <option>Russian_Federation</option>
+            <option>South_Africa</option>
+        </select>
+    </div>
+
+  </body>
+</html>
