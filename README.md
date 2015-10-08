@@ -12,3 +12,8 @@ Inspiration
 -----------
 I got the inspiration to do this visualization from a chapter in the book
 [Econophysics - Background and Applications in Economics, Finance, and Sociophysics](https://www.goodreads.com/book/show/16585563-econophysics).
+
+
+Screenshot
+----------
+![Screenshot of the visualization](screenshot.png)
