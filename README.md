@@ -1,6 +1,6 @@
 GDP correlations
 ================
-See visualization [here](http://tberg.dk/GDP-correlations/). Made for this [blog post](http://tberg.dk/post/GDP-correlations).
+See visualization [here](http://tberg.dk/GDP-correlations/). Made for this [blog post](http://tberg.dk/post/GDP-correlations). Adapted from [this](http://mbostock.github.io/d3/talk/20111116/bundle.html) d3js example.
 
 GDP DATA sources
 ----------------
