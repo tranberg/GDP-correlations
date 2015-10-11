@@ -86,6 +86,8 @@ d3.json("correlations.json", function(classes) {
       .attr("text-anchor", function(d) { return d.x < 180 ? "start" : "end"; })
       .attr("transform", function(d) { return d.x < 180 ? null : "rotate(180)"; })
       .text(function(d) { return d.key; })
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout);
 
     // Show only links for corr +/- .2
     d3.selectAll("[class=makeUpdate]").on("change", function() {
@@ -165,6 +167,22 @@ function mouseup() {
         .attr("text-anchor", function(d) { return (d.x + rotate) % 360 < 180 ? "start" : "end"; })
         .attr("transform", function(d) { return (d.x + rotate) % 360 < 180 ? null : "rotate(180)"; });
   }
+}
+
+function mouseover(d) {
+  svg.selectAll("path.link.target-" + d.key)
+      .classed("source", true)
+
+  svg.selectAll("path.link.source-" + d.key)
+      .classed("source", true)
+}
+
+function mouseout(d) {
+  svg.selectAll("path.link.source-" + d.key)
+      .classed("source", false)
+
+  svg.selectAll("path.link.target-" + d.key)
+      .classed("source", false)
 }
 
 function cross(a, b) {
